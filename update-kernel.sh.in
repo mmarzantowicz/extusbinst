@@ -1,5 +1,8 @@
 #!/bin/bash
 #
+# Copyright (c) 2018 Mateusz Marzantowicz
+#
+# SPDX-License-Identifier: MIT
 
 set -euo pipefail
 shopt -s extglob
