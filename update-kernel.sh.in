@@ -1,0 +1,116 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+shopt -s extglob
+
+readonly CONFIG=
+readonly KERNEL_PACKAGE=
+readonly VERSION=@version@
+
+BOOTABLE_DEVICES=()
+
+# Read configuration file
+[[ -f ${CONFIG} ]] && {
+    . ${CONFIG}
+}
+
+m4_include(color.sh)
+m4_include(messages.sh)
+
+# Return path of kernel image
+kernel_image() {
+    printf '/boot/vmlinuz-%s' "$1"
+}
+
+# Return path of initial ramdisk
+initrd_image() {
+    printf '/boot/initramfs-%s.img' "$1"
+}
+
+# Copy initial ramdisk file(s) to destination device
+install_initrd() {
+    local -r initrd=$1; shift
+    local -r dest=$1
+
+    msg "Installing initial ramdisk '${initrd}' on '${dest}'"
+
+    cp "$initrd" "$dest" &>/dev/null || {
+        error "Could not copy initial ramdisk to '$dest'"
+        return 1
+    }
+}
+
+# Copy kernel file(s) to destination device
+install_kernel() {
+    local -r kernel=$1; shift
+    local -r dest=$1
+
+    msg "Installing kernel image '${kernel}' on '${dest}'"
+
+    cp "$kernel" "$dest" &>/dev/null || {
+        error "Could not copy kernel image to '$dest'"
+        return 1
+    }
+}
+
+# See if kernel package is installed
+is_installed() {
+    local -r pkg=$1
+
+    pacman -Qq "$pkg" &>/dev/null || {
+        error "Kernel package '$pkg' is not installed"
+        return 1
+    }
+}
+
+# Update kernel and initial ramdisk on each bootable device
+update_kernel() {
+    local -r kernel=$1
+    local device
+
+    for device in "${BOOTABLE_DEVICES[@]}"; do
+        verify_destination "$device" && {
+            install_kernel "$( kernel_image "$kernel" )" "$device"
+            install_initrd "$( initrd_image "$kernel" )" "$device"
+        }
+    done
+
+    return 0
+}
+
+# Check path is a valid destination device for kernel and initrd files
+verify_destination() {
+    local -r dest=$1
+
+    [[ -d $dest ]] || {
+        error "'$dest' is not a directory. Skipping device."
+        return 1
+    }
+
+    mountpoint -q "$dest" || {
+        error "'$dest' is not a mountpoint. Skipping device."
+        return 1
+    }
+
+    [[ -w $dest ]] || {
+        error "'$dest' is not writable. Skipping device."
+        return 1
+    }
+
+    return 0
+}
+
+# Main: start here
+main() {
+    enable_colors
+
+    case "$1" in
+        @($KERNEL_PACKAGE)) is_installed "$1" && update_kernel "$1" ;;
+        *) error "Invalid kernel package '$1' specified."; exit 1 ;;
+    esac
+}
+
+main "$@" && exit 0
+
+# vim: set ft=sh ts=4 sw=4 et:
