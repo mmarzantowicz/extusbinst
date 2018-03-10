@@ -9,7 +9,7 @@ shopt -s extglob
 
 readonly CONFIG=
 readonly KERNEL_PACKAGE=
-readonly VERSION=@version@
+readonly VERSION=
 
 BOOTABLE_DEVICES=()
 
